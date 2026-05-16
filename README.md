@@ -1,87 +1,107 @@
-# Fun and Simple Portfolio with R3F — Three.js Journey
+# Physics with R3F — Three.js Journey
 
-Quick recap of what I learned in the **Fun and Simple Portfolio with R3F** lesson from [Three.js Journey](https://threejsjourney.com/) by Bruno Simon, implemented with **React Three Fiber**.
+Quick recap of what I learned in the **Physics** lesson from [Three.js Journey](https://threejsjourney.com/) by Bruno Simon, implemented with **React Three Fiber** and **Rapier** via [`@react-three/rapier`](https://github.com/pmndrs/react-three-rapier).
 
 ## What this project covers
 
-This project is a small 3D portfolio scene built with R3F and **Drei** helpers: loading a GLTF model, embedding real web content on the screen, and polishing the presentation with lighting, shadows, and controls.
+This project is a small physics playground: falling objects, user interaction, kinematic movers, custom colliders on a loaded model, invisible walls, and many instanced bodies for performance.
 
-- **`useGLTF`** to load the MacBook model from the course resources.
-- **`Environment`** for image-based lighting (`preset="city"`).
-- **`PresentationControls`** for drag-to-rotate interaction with damping and snap.
-- **`Float`** for subtle idle motion on the laptop group.
-- **`rectAreaLight`** to simulate light coming from the screen.
-- **`Html`** with `transform` to map an `<iframe>` onto the laptop display.
-- **`Text`** with a custom `.woff` font for a 3D name label.
-- **`ContactShadows`** for a grounded contact shadow under the model.
-- **Canvas `className` + CSS** (`touch-action: none`) so touch gestures work correctly on mobile.
+- **`@react-three/rapier`** and the **`<Physics>`** provider to run the simulation.
+- **`RigidBody`** for dynamic, fixed, and kinematic objects.
+- **Automatic vs manual colliders** (`colliders="ball"`, `colliders={false}` + `CuboidCollider` / `CylinderCollider`).
+- **Forces and impulses** (`applyImpulse`, `applyTorqueImpulse`) triggered from React events.
+- **Kinematic bodies** moved each frame with `setNextKinematicTranslation` / `setNextKinematicRotation`.
+- **Collision callbacks** (`onCollisionEnter`) and simple audio feedback.
+- **`useGLTF`** with a custom collider on a complex mesh.
+- **`InstancedRigidBodies`** to simulate many cubes efficiently.
+- **`r3f-perf`** to monitor frame cost while stress-testing instances.
 
 ## What I built
 
-- A full-screen **R3F `Canvas`** with a perspective camera (`fov: 45`, positioned to frame the laptop).
-- A dark **background color** (`#241a1a`) to keep focus on the model.
-- A **MacBook GLTF** loaded via `useGLTF`, slightly lowered on the Y axis.
-- **`PresentationControls`** wrapping the laptop:
-  - `global` rotation limits (`rotation`, `polar`, `azimuth`).
-  - `damping={0.1}` and `snap` for smooth, satisfying interaction.
-- A **`Float`** group with `rotationIntensity={0.4}` for gentle movement.
-- A **`rectAreaLight`** above the screen area to brighten the display realistically.
-- An **`Html`** overlay on the laptop screen:
-  - `transform` + `distanceFactor` so the DOM scales with the 3D view.
-  - `wrapperClass="html-content"` for iframe styling in CSS.
-  - An **`<iframe>`** pointing to my portfolio site.
-- **`Text`** (“Killian David”) using the Bangers font, positioned beside the laptop.
-- **`ContactShadows`** under the model (`opacity`, `scale`, `blur` tuned for a soft ground shadow).
+- A full-screen **R3F `Canvas`** with shadows and a perspective camera.
+- A **`<Physics debug>`** world containing:
+  - An **orange sphere** with an auto-generated ball collider (`colliders="ball"`).
+  - A **purple cube** with a manual cuboid collider; **click** to jump (impulse + random torque).
+  - A **green floor** (`type="fixed"`) that does not move.
+  - A **red twister** (`type="kinematicPosition"`, `friction={0}`) that orbits and spins via `useFrame`.
+  - A **hamburger GLTF** with a **cylinder collider** instead of mesh-based collision.
+  - **Invisible walls** (fixed `RigidBody` + cuboid colliders only, no visible mesh).
+  - **100 instanced cubes** spawned above the scene via `InstancedRigidBodies`.
+- **Collision sound** on the interactive cube (`hit.mp3`, random volume).
+- **`Perf`** overlay to watch performance with many rigid bodies.
 
 ## What I learned
 
-### 1) Why a 3D portfolio wrapper
+### 1) Why physics in Three.js
 
-- A portfolio is often your most important project—it should show what you can build.
-- If you already have an HTML/CSS portfolio, you can **reuse it** inside a 3D scene instead of rebuilding everything in WebGL.
-- A laptop model + embedded page is a memorable way to present projects without abandoning familiar web tech.
+- Realistic motion (gravity, collisions, stacking, bouncing) is hard to fake by hand.
+- A **physics engine** integrates forces over time and resolves contacts between shapes.
+- In R3F, **Rapier** (via `@react-three/rapier`) wraps the simulation in React components so bodies stay in sync with the render loop.
 
-### 2) Finding and loading a model
+### 2) The Physics provider
 
-- Free models ready for R3F are listed on [PMNDRS Market](https://market.pmnd.rs/) (e.g. the MacBook model).
-- **`useGLTF(url)`** loads the file and gives a scene you can render with `<primitive object={computer.scene} />`.
-- If the market is unavailable, the course provides a fallback URL:  
-  `https://threejs-journey.com/resources/models/macbook_model.gltf`
+- Wrap interactive content in **`<Physics>`** (optionally `debug` to visualize colliders).
+- Rapier uses a **fixed timestep**; the library steps the world and updates `RigidBody` transforms for you.
+- Enable **`shadows`** on the Canvas so `castShadow` / `receiveShadow` on meshes look correct.
 
-### 3) Scene mood and lighting
+### 3) RigidBody types
 
-- A **`color`** attached to `"background"` sets the canvas clear color and sets the tone of the experience.
-- **`Environment`** adds realistic reflections and ambient light from an HDR preset without hand-placing many lights.
-- A **`rectAreaLight`** near the screen mimics emissive light from the display and sells the “lit screen” look.
+| Type | Role in this scene |
+|------|-------------------|
+| **Dynamic** (default) | Sphere, cube, hamburger, instanced cubes — affected by gravity and collisions. |
+| **`fixed`** | Floor and walls — infinite mass, never moves. |
+| **`kinematicPosition`** | Red twister — position/rotation driven by code each frame, still pushes dynamic objects. |
 
-### 4) Presentation controls
+Kinematic bodies are useful for moving platforms, doors, or scripted obstacles without fighting the solver.
 
-- **`PresentationControls`** (Drei) lets users rotate the model with pointer or touch—more engaging than static `OrbitControls` for a product-style showcase.
-- **`polar`** and **`azimuth`** clamp how far the user can orbit.
-- **`damping`** controls how snappy the motion feels (lower = slower settle).
-- **`snap`** returns the model to a rest pose when interaction ends.
+### 4) Colliders
 
-### 5) Embedding HTML in the 3D world
+- **`colliders="ball"`** (and similar shortcuts) auto-fit a primitive collider to the child mesh.
+- **`colliders={false}`** disables auto colliders so you can place precise shapes:
+  - **`CuboidCollider`** — boxes (half-extents in `args`).
+  - **`CylinderCollider`** — capsules/cylinders (useful for burger-like shapes).
+- Colliders can exist **without a visible mesh** (the arena walls).
+- **`mass`** on a collider overrides default mass distribution when needed.
 
-- Drei’s **`Html`** component can render DOM (including **`<iframe>`**) inside the scene.
-- With **`transform`**, the HTML plane follows the laptop screen’s position and rotation in 3D.
-- **`distanceFactor`** scales the DOM so it stays readable as the camera moves.
-- **`wrapperClass`** links to regular CSS (iframe size, border-radius, etc.) in `index.css`.
+### 5) Forces, impulses, and interaction
 
-### 6) Typography and polish
+- **`applyImpulse({ x, y, z }, wakeUp)`** gives an instant change in linear velocity (good for jumps).
+- **`applyTorqueImpulse`** spins the body; combined with random values it feels unpredictable.
+- **`onClick`** on a mesh inside a `RigidBody` is a simple way to tie UI input to physics.
+- Keep a **`ref`** to `RapierRigidBody` to call these methods from event handlers or `useFrame`.
 
-- **`Text`** renders 3D type with a loaded font file (`font`, `fontSize`, `maxWidth`, `textAlign`).
-- **`ContactShadows`** adds a cheap, convincing shadow on an invisible ground plane—no custom shadow setup required.
-- **`Float`** adds light procedural motion so the scene feels alive without complex animation code.
+### 6) Kinematic animation in `useFrame`
 
-### 7) Mobile and touch
+- For `kinematicPosition`, set the **next** pose before the physics step:
+  - **`setNextKinematicTranslation({ x, y, z })`**
+  - **`setNextKinematicRotation(quaternion)`** (convert from `Euler` with `Quaternion.setFromEuler`).
+- Animate with time (`state.clock.getElapsedTime()`) for circular paths and continuous rotation.
+- **`friction={0}`** on the twister reduces sticking when objects slide across it.
 
-- On recent Drei versions, set **`className`** on `<Canvas>` and use **`touch-action: none`** in CSS on that class so drag gestures on the model are not swallowed by the browser’s default touch behavior.
+### 7) Collisions and feedback
 
-### 8) Tweaking values
+- **`onCollisionEnter`** fires when contact starts — useful for sounds, particles, or game logic.
+- Reuse one **`Audio`** element, reset `currentTime`, vary **`volume`** for variety.
+- Physics events are a bridge between the simulation and gameplay feel.
 
-- Placement of lights, iframe, text, and controls is mostly **trial and error**.
-- The lesson recommends a debug UI like **Leva** when building your own variant; this repo uses fixed values from the course.
+### 8) Models and complex shapes
+
+- **`useGLTF`** loads `hamburger.glb`; the visual is a `<primitive object={scene} />`.
+- Mesh-accurate collision is expensive; a **simple collider** (cylinder) approximates the model well enough.
+- Scale the model in JSX; tune collider `args` to match the scaled bounds.
+
+### 9) Performance: instanced rigid bodies
+
+- Many duplicate objects (100 cubes) should not mean 100 separate draw-call-heavy setups without care.
+- **`InstancedRigidBodies`** + **`instancedMesh`** share one mesh while each instance has its own rigid body.
+- Pre-build an array of **`InstancedRigidBodyProps`** (`key`, `position`, `rotation`) for initial poses.
+- Use **`Perf`** (or similar) to confirm the scene stays interactive under load.
+
+### 10) Mental model
+
+- **Mesh** = what you see; **Collider** = what the engine touches; they are related but not the same.
+- **Dynamic** bodies “live” in the simulation; **fixed** bodies define the world; **kinematic** bodies follow your script but still affect others.
+- Start with debug colliders, tune sizes, then turn debug off for the final look.
 
 ## Run the project
 
@@ -89,6 +109,8 @@ This project is a small 3D portfolio scene built with R3F and **Drei** helpers: 
 npm install
 npm run dev
 ```
+
+Click the **purple cube** to make it jump. Watch the red **twister** push objects around the arena.
 
 ## Credits
 
