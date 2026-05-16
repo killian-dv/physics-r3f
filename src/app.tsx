@@ -10,6 +10,7 @@ export const App = () => {
         far: 200,
         position: [4, 2, 6],
       }}
+      shadows
     >
       <Experience />
     </Canvas>
