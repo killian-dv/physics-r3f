@@ -3,13 +3,35 @@ import { useFrame } from "@react-three/fiber";
 import {
   CuboidCollider,
   CylinderCollider,
+  InstancedRigidBodies,
   Physics,
   RapierRigidBody,
   RigidBody,
 } from "@react-three/rapier";
+import type { InstancedRigidBodyProps } from "@react-three/rapier";
 import { Perf } from "r3f-perf";
 import { useRef } from "react";
-import { Euler, Quaternion } from "three";
+import { Euler, Quaternion, Vector3 } from "three";
+
+const CUBES_COUNT = 100;
+
+function createCubeInstances(count: number): InstancedRigidBodyProps[] {
+  const instances: InstancedRigidBodyProps[] = [];
+  for (let i = 0; i < count; i++) {
+    instances.push({
+      key: "instance_" + i,
+      position: new Vector3(
+        (Math.random() - 0.5) * 8,
+        6 + i * 0.2,
+        (Math.random() - 0.5) * 8,
+      ),
+      rotation: new Euler(Math.random(), Math.random(), Math.random()),
+    });
+  }
+  return instances;
+}
+
+const cubeInstances = createCubeInstances(CUBES_COUNT);
 
 export function Experience() {
   const cube = useRef<RapierRigidBody>(null);
@@ -110,6 +132,24 @@ export function Experience() {
           <primitive object={hamburger.scene} scale={0.25} />
           <CylinderCollider args={[0.5, 1.25]} />
         </RigidBody>
+
+        <RigidBody type="fixed">
+          <CuboidCollider args={[5, 2, 0.5]} position={[0, 1, 5.5]} />
+          <CuboidCollider args={[5, 2, 0.5]} position={[0, 1, -5.5]} />
+          <CuboidCollider args={[0.5, 2, 5]} position={[5.5, 1, 0]} />
+          <CuboidCollider args={[0.5, 2, 5]} position={[-5.5, 1, 0]} />
+        </RigidBody>
+
+        <InstancedRigidBodies instances={cubeInstances}>
+          <instancedMesh
+            args={[undefined, undefined, CUBES_COUNT]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry />
+            <meshStandardMaterial color="tomato" />
+          </instancedMesh>
+        </InstancedRigidBodies>
       </Physics>
     </>
   );
